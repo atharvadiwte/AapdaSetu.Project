@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AapdaSetu — Multi-Hazard Disaster Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="style.css?v=3" />
+</head>
+<body>
+
+<header
+  class="topbar"
+  style="margin: 0; border-radius: 16px; width: auto; max-width: fit-content; display: inline-flex; box-sizing: border-box;"
+>
+  <div class="brand">
+    <div class="brand-copy">
+      <div class="brand-title-wrap">
+        <h1>AapdaSetu</h1>
+      </div>
+      <p>Multi-hazard watch for India</p>
+    </div>
+    <span class="brand-mark"><i class="fa-solid fa-earth-americas"></i></span>
+  </div>
+</header>
+<div class="status-pill" id="dataStatus"><span class="status-dot"></span>Showing sample data</div>
+
+<main class="layout">
+  <section class="map-panel">
+    <div id="map"></div>
+
+    <div class="sidebar-shell" id="sidebarShell">
+      <div class="panel-stack" id="panelStack">
+        <div class="panel-group">
+          <section class="panel panel-soft panel-collapsible">
+            <div class="panel-header">
+              <h2>Hazard layers</h2>
+              <div class="panel-header-actions">
+                <span class="pill"><span class="live-dot"></span>Live</span>
+                <button class="panel-toggle" type="button" aria-label="Collapse Hazard layers" aria-expanded="true">
+                  <i class="fa-solid fa-chevron-up"></i>
+                </button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <ul class="legend" id="legendList">
+                <li data-type="fire"><label><input type="checkbox" checked data-layer="fire"><span class="icon-badge fire"><i class="fa-solid fa-fire-flame-curved"></i></span>Fire</label></li>
+                <li data-type="flood"><label><input type="checkbox" checked data-layer="flood"><span class="icon-badge flood"><i class="fa-solid fa-water"></i></span>Flood</label></li>
+                <li data-type="cyclone"><label><input type="checkbox" checked data-layer="cyclone"><span class="icon-badge cyclone"><i class="fa-solid fa-wind"></i></span>Cyclone</label></li>
+                <li data-type="landslide"><label><input type="checkbox" checked data-layer="landslide"><span class="icon-badge landslide"><i class="fa-solid fa-mountain-sun"></i></span>Landslide</label></li>
+                <li data-type="report"><label><input type="checkbox" checked data-layer="report"><span class="icon-badge report"><i class="fa-solid fa-people-group"></i></span>Community reports</label></li>
+              </ul>
+            </div>
+          </section>
+
+          <section class="panel panel-collapsible" id="detailPanel">
+            <div class="panel-header">
+              <h2>Selected event</h2>
+              <button class="panel-toggle" type="button" aria-label="Collapse Selected event" aria-expanded="true">
+                <i class="fa-solid fa-chevron-up"></i>
+              </button>
+            </div>
+            <div class="panel-body">
+              <p class="muted">Tap a marker on the map to see details and a safety checklist here.</p>
+            </div>
+          </section>
+
+          <section class="panel panel-soft panel-collapsible">
+            <div class="panel-header">
+              <h2>Report something</h2>
+              <button class="panel-toggle" type="button" aria-label="Collapse Report something" aria-expanded="true">
+                <i class="fa-solid fa-chevron-up"></i>
+              </button>
+            </div>
+            <div class="panel-body">
+              <p class="muted small">See a flooded road or a hazard not on the map? Add it — it'll show up as a community marker.</p>
+              <button id="reportBtn" class="btn primary"><i class="fa-solid fa-location-dot"></i> Drop a report pin</button>
+              <p class="muted small report-hint" id="reportHint" hidden>Now click anywhere on the map to place your report.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div class="floating-legend">
+      <h3>Legend</h3>
+      <div class="legend-item"><span class="legend-dot fire"></span> Fire</div>
+      <div class="legend-item"><span class="legend-dot flood"></span> Flood</div>
+      <div class="legend-item"><span class="legend-dot cyclone"></span> Cyclone</div>
+      <div class="legend-item"><span class="legend-dot landslide"></span> Landslide</div>
+      <div class="legend-item"><span class="legend-dot report"></span> Community</div>
+    </div>
+  </section>
+</main>
+
+<!-- Simple report form, hidden until a map click happens in "report mode" -->
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <form class="modal" id="reportForm">
+    <h2>New report</h2>
+    <label for="reportType">Hazard type</label>
+    <select id="reportType" required>
+      <option value="fire">Fire</option>
+      <option value="flood">Flood</option>
+      <option value="cyclone">Cyclone / storm damage</option>
+      <option value="landslide">Landslide</option>
+      <option value="other">Other</option>
+    </select>
+    <label for="reportNote">What's happening?</label>
+    <textarea id="reportNote" rows="3" placeholder="e.g. Road flooded near the bridge, not passable" required></textarea>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" id="cancelReport">Cancel</button>
+      <button type="submit" class="btn">Submit report</button>
+    </div>
+  </form>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

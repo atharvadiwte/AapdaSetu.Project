@@ -1,0 +1,17 @@
+{
+  "name": "prahari-backend",
+  "version": "1.0.0",
+  "description": "Small Express backend for the Prahari disaster tracker: shared community reports + a NASA FIRMS fire-data proxy.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}
