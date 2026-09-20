@@ -10,6 +10,83 @@
 // Replace this array's contents with real API results — see the
 // "REAL DATA SOURCES" note at the bottom of this file.
 
+const dataStatusEl = document.getElementById("dataStatus");
+const sourceErrorBannerEl = document.getElementById("sourceErrorBanner");
+
+function setDataStatusDemo() {
+  if (!dataStatusEl) return;
+  dataStatusEl.innerHTML = '<span class="status-dot status-dot-demo"></span><span class="status-copy">Showing demo data</span>';
+}
+
+function setDataStatusLive() {
+  if (!dataStatusEl) return;
+  dataStatusEl.innerHTML = '<span class="status-dot"></span><span class="status-copy">Last updated: recently</span>';
+}
+
+const liveSourceStates = { gdacs: "pending", firms: "pending", usgs: "pending" };
+const sourceErrorMessages = {
+  gdacs: "Flood/cyclone data temporarily unavailable — showing sample data",
+  firms: "Fire data temporarily unavailable — showing sample data",
+  usgs: "Landslide data temporarily unavailable — showing sample data"
+};
+const sourceErrors = { gdacs: "", firms: "", usgs: "" };
+
+function setSourceError(source, message) {
+  if (!(source in sourceErrors)) return;
+  sourceErrors[source] = message;
+  updateSourceErrorBanner();
+}
+
+function clearSourceError(source) {
+  sourceErrors[source] = "";
+  updateSourceErrorBanner();
+}
+
+function updateSourceErrorBanner() {
+  if (!sourceErrorBannerEl) return;
+  const activeMessages = Object.values(sourceErrors).filter(Boolean);
+
+  if (!activeMessages.length) {
+    sourceErrorBannerEl.hidden = true;
+    sourceErrorBannerEl.innerHTML = "";
+    return;
+  }
+
+  sourceErrorBannerEl.hidden = false;
+  sourceErrorBannerEl.innerHTML = activeMessages.map((message) => `<span>${message}</span>`).join("");
+}
+
+function resolveLiveSource(source, outcome) {
+  if (!(source in liveSourceStates)) return;
+  liveSourceStates[source] = outcome;
+}
+
+function scheduleSourceTimeout(source, fallbackMessage) {
+  setTimeout(() => {
+    if (liveSourceStates[source] === "pending") {
+      resolveLiveSource(source, "failed");
+      setSourceError(source, fallbackMessage);
+      setDataStatusDemo();
+    }
+  }, 10000);
+}
+
+function updateLegendCounts() {
+  const counts = {
+    fire: layerGroups.fire ? layerGroups.fire.getLayers().length : 0,
+    flood: layerGroups.flood ? layerGroups.flood.getLayers().length : 0,
+    cyclone: layerGroups.cyclone ? layerGroups.cyclone.getLayers().length : 0,
+    landslide: layerGroups.landslide ? layerGroups.landslide.getLayers().length : 0,
+    report: layerGroups.report ? layerGroups.report.getLayers().length : 0
+  };
+
+  document.querySelectorAll(".legend-count[data-count-for]").forEach((el) => {
+    const key = el.dataset.countFor;
+    const count = counts[key] ?? 0;
+    el.textContent = `(${count})`;
+  });
+}
+
 const HAZARD_EVENTS = [
   {
     id: "demo-fire-1",
@@ -65,6 +142,134 @@ const HAZARD_EVENTS = [
   }
 ];
 
+function xmlTagText(node, candidateNames) {
+  if (!node) return "";
+
+  const elements = [node, ...Array.from(node.getElementsByTagName("*"))];
+  for (const element of elements) {
+    const tagName = (element.tagName || "").toLowerCase();
+    const localName = tagName.includes(":") ? tagName.split(":").pop() : tagName;
+    if (candidateNames.some((name) => name.toLowerCase() === tagName || name.toLowerCase() === localName)) {
+      return (element.textContent || "").trim();
+    }
+  }
+
+  return "";
+}
+
+function severityFromAlertLevel(alertLevel) {
+  const level = (alertLevel || "").toLowerCase();
+
+  if (["red", "extreme", "catastrophic", "high"].includes(level)) return "high";
+  if (["orange", "yellow", "moderate", "warning"].includes(level)) return "moderate";
+  return "low";
+}
+
+function checklistForHazard(type) {
+  if (type === "flood") {
+    return [
+      "Avoid waterlogged roads and underpasses",
+      "Move vehicles and valuables to higher floors",
+      "Keep phone charged; save local disaster helpline numbers"
+    ];
+  }
+
+  if (type === "cyclone") {
+    return [
+      "Follow evacuation orders from local authorities immediately",
+      "Secure loose objects outdoors",
+      "Stock drinking water and a charged power bank"
+    ];
+  }
+
+  return [
+    "Follow local advisories and stay alert",
+    "Keep emergency supplies ready",
+    "Avoid unsafe or unstable areas"
+  ];
+}
+
+function gdacsItemToHazardEvent(item) {
+  const eventType = xmlTagText(item, ["gdacs:eventtype", "eventtype"]).toUpperCase();
+  const type = eventType === "FL" ? "flood" : eventType === "TC" ? "cyclone" : null;
+
+  if (!type) return null;
+
+  const latText = xmlTagText(item, ["geo:lat", "lat"]);
+  const lngText = xmlTagText(item, ["geo:long", "geo:lon", "long", "lon"]);
+  const lat = Number.parseFloat(latText);
+  const lng = Number.parseFloat(lngText);
+
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+
+  const eventId = xmlTagText(item, ["gdacs:eventid", "eventid"]) || `${Date.now()}-${Math.random()}`;
+  const alertLevel = xmlTagText(item, ["gdacs:alertlevel", "alertlevel"]) || "Green";
+  const title = xmlTagText(item, ["title"]) || `${type.charAt(0).toUpperCase() + type.slice(1)} alert`;
+  const updated = xmlTagText(item, ["gdacs:datemodified", "datemodified", "pubDate"]) || "Live GDACS feed";
+
+  return {
+    id: `gdacs-${type}-${eventId}`,
+    type,
+    lat,
+    lng,
+    title,
+    severity: severityFromAlertLevel(alertLevel),
+    updated: `GDACS • ${updated}`,
+    checklist: checklistForHazard(type)
+  };
+}
+
+function parseGdacsXml(xmlText) {
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+
+  const parseError = xmlDoc.querySelector("parsererror");
+  if (parseError) {
+    throw new Error("GDACS XML could not be parsed");
+  }
+
+  const items = Array.from(xmlDoc.querySelectorAll("item"));
+  return items
+    .map(gdacsItemToHazardEvent)
+    .filter(Boolean)
+    .filter((event, index, allEvents) => allEvents.findIndex((other) => other.id === event.id) === index);
+}
+
+async function loadGdacsLiveHazards() {
+  scheduleSourceTimeout("gdacs", sourceErrorMessages.gdacs);
+
+  try {
+    const response = await fetch("/api/gdacs");
+
+    if (!response.ok) {
+      throw new Error(`GDACS proxy request failed with status ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const gdacsEvents = Array.isArray(payload.data) ? payload.data : [];
+
+    if (!gdacsEvents.length) {
+      resolveLiveSource("gdacs", "success");
+      clearSourceError("gdacs");
+      console.warn("GDACS feed loaded, but no flood/cyclone events were found within India’s bounds.");
+      return;
+    }
+
+    const existingNonLiveEvents = HAZARD_EVENTS.filter((event) => event.type !== "flood" && event.type !== "cyclone");
+    HAZARD_EVENTS.splice(0, HAZARD_EVENTS.length, ...existingNonLiveEvents, ...gdacsEvents);
+    renderHazardEvents();
+    resolveLiveSource("gdacs", "success");
+    clearSourceError("gdacs");
+    setDataStatusLive();
+    console.log("Loaded GDACS flood/cyclone events:", gdacsEvents);
+  } catch (error) {
+    resolveLiveSource("gdacs", "failed");
+    setSourceError("gdacs", sourceErrorMessages.gdacs);
+    setDataStatusDemo();
+    console.warn("Falling back to the demo flood and cyclone points because the GDACS feed failed:", error);
+  }
+}
+
 const SEVERITY_COLOR = { high: "#ef4444", moderate: "#f59e0b", low: "#22c55e" };
 const HAZARD_COLORS = {
   fire: "#ff3b30",
@@ -87,13 +292,22 @@ Object.entries(HAZARD_COLORS).forEach(([key, value]) => {
 });
 
 // ---- 2. MAP SETUP ----------------------------------------------
-const map = L.map("map", { zoomControl: false }).setView([22.5, 79.5], 5);
+const map = L.map("map", {
+  zoomControl: false,
+  maxBounds: [[-90, -180], [90, 180]],
+  maxBoundsViscosity: 1.0,
+  worldCopyJump: false
+}).setView([22.5, 79.5], 5);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: '&copy; OpenStreetMap contributors',
-  maxZoom: 20
+  maxZoom: 20,
+  noWrap: true
 }).addTo(map);
+
+map.invalidateSize();
+setTimeout(() => map.invalidateSize(), 200);
 
 const layerGroups = {
   fire: L.layerGroup().addTo(map),
@@ -144,11 +358,89 @@ function markerFor(event, isReport) {
 }
 
 function renderHazardEvents() {
+  Object.values(layerGroups).forEach(group => group.clearLayers());
+
   HAZARD_EVENTS.forEach(ev => {
     markerFor(ev, false).addTo(layerGroups[ev.type]);
   });
+
+  updateLegendCounts();
 }
+
+async function loadNasaFirmsFireData() {
+  scheduleSourceTimeout("firms", sourceErrorMessages.firms);
+
+  try {
+    const response = await fetch('/api/firms');
+
+    if (!response.ok) {
+      throw new Error(`NASA FIRMS proxy request failed with status ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const fireEvents = Array.isArray(payload.data) ? payload.data : [];
+
+    if (!fireEvents.length) {
+      resolveLiveSource("firms", "success");
+      clearSourceError("firms");
+      console.warn('NASA FIRMS feed loaded, but no active fire detections were returned.');
+      return;
+    }
+
+    const existingNonLiveEvents = HAZARD_EVENTS.filter((event) => event.type !== 'fire');
+    HAZARD_EVENTS.splice(0, HAZARD_EVENTS.length, ...existingNonLiveEvents, ...fireEvents);
+    renderHazardEvents();
+    resolveLiveSource("firms", "success");
+    clearSourceError("firms");
+    setDataStatusLive();
+    console.log('Loaded NASA FIRMS fire events:', fireEvents);
+  } catch (error) {
+    resolveLiveSource("firms", "failed");
+    setSourceError("firms", sourceErrorMessages.firms);
+    setDataStatusDemo();
+    console.warn('Falling back to the demo fire point because the NASA FIRMS feed failed:', error);
+  }
+}
+
+async function loadUsgsLandslideRiskData() {
+  scheduleSourceTimeout("usgs", sourceErrorMessages.usgs);
+
+  try {
+    const response = await fetch('/api/landslide-risk');
+
+    if (!response.ok) {
+      throw new Error(`USGS proxy request failed with status ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const landslideRiskEvents = Array.isArray(payload.data) ? payload.data : [];
+
+    if (!landslideRiskEvents.length) {
+      resolveLiveSource("usgs", "success");
+      clearSourceError("usgs");
+      console.warn('USGS earthquake feed loaded, but no landslide-risk indicators were returned.');
+      return;
+    }
+
+    const existingNonLiveEvents = HAZARD_EVENTS.filter((event) => event.type !== 'landslide');
+    HAZARD_EVENTS.splice(0, HAZARD_EVENTS.length, ...existingNonLiveEvents, ...landslideRiskEvents);
+    renderHazardEvents();
+    resolveLiveSource("usgs", "success");
+    clearSourceError("usgs");
+    setDataStatusLive();
+    console.log('Loaded USGS landslide-risk indicator events:', landslideRiskEvents);
+  } catch (error) {
+    resolveLiveSource("usgs", "failed");
+    setSourceError("usgs", sourceErrorMessages.usgs);
+    setDataStatusDemo();
+    console.warn('Falling back to the demo landslide point because the USGS risk feed failed:', error);
+  }
+}
+
 renderHazardEvents();
+loadGdacsLiveHazards();
+loadNasaFirmsFireData();
+loadUsgsLandslideRiskData();
 
 function addLayerSeverityIndicators() {
   document.querySelectorAll("#legendList li").forEach(item => {
@@ -260,12 +552,51 @@ document.querySelectorAll("input[data-layer]").forEach(box => {
   });
 });
 
-// ---- 5. COMMUNITY REPORTING (saved in this browser via localStorage) ----
+const dataSourceBtn = document.getElementById("dataSourceBtn");
+const dataSourceModal = document.getElementById("dataSourceModal");
+const closeDataSourceModalBtn = document.getElementById("closeDataSourceModal");
+
+function openDataSourceModal() {
+  if (!dataSourceModal) return;
+  dataSourceModal.hidden = false;
+}
+
+function closeDataSourceModal() {
+  if (!dataSourceModal) return;
+  dataSourceModal.hidden = true;
+}
+
+if (dataSourceBtn) {
+  dataSourceBtn.addEventListener("click", openDataSourceModal);
+}
+
+if (closeDataSourceModalBtn) {
+  closeDataSourceModalBtn.addEventListener("click", closeDataSourceModal);
+}
+
+if (dataSourceModal) {
+  dataSourceModal.addEventListener("click", (event) => {
+    if (event.target === dataSourceModal) {
+      closeDataSourceModal();
+    }
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && dataSourceModal && !dataSourceModal.hidden) {
+    closeDataSourceModal();
+  }
+});
+
+// ---- 5. COMMUNITY REPORTING (saved in Firestore and synced live) ----
 const reportBtn = document.getElementById("reportBtn");
 const reportHint = document.getElementById("reportHint");
 const modalBackdrop = document.getElementById("modalBackdrop");
 const reportForm = document.getElementById("reportForm");
 const cancelReport = document.getElementById("cancelReport");
+
+const db = firebase.firestore();
+const reportsCollection = db.collection("reports");
 
 let reportMode = false;
 let pendingLatLng = null;
@@ -290,46 +621,63 @@ cancelReport.addEventListener("click", () => {
   reportForm.reset();
 });
 
-reportForm.addEventListener("submit", (e) => {
+reportForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const type = document.getElementById("reportType").value;
   const note = document.getElementById("reportNote").value.trim();
   if (!pendingLatLng || !note) return;
 
   const report = {
-    id: "report-" + Date.now(),
     type,
     lat: pendingLatLng.lat,
     lng: pendingLatLng.lng,
     title: "Community report — " + type,
     updated: "Just now",
-    note
+    note,
+    severity: "low",
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
   try {
-    saveReport(report);
+    const docRef = await reportsCollection.add(report);
+    const savedReport = { id: docRef.id, ...report };
+    showDetail(savedReport, true);
   } catch (err) {
-    console.warn("Couldn't save report to local storage:", err);
+    console.warn("Couldn't save report to Firestore:", err);
   }
-  markerFor(report, true).addTo(layerGroups.report);
-  showDetail(report, true);
 
   modalBackdrop.hidden = true;
   reportForm.reset();
   pendingLatLng = null;
 });
 
-function loadReports() {
-  try {
-    const raw = localStorage.getItem("prahari_reports");
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+function renderCommunityReports(snapshot) {
+  layerGroups.report.clearLayers();
+
+  snapshot.forEach((doc) => {
+    const data = doc.data();
+    const report = {
+      id: doc.id,
+      type: data.type,
+      lat: data.lat,
+      lng: data.lng,
+      title: data.title || "Community report",
+      severity: data.severity || "low",
+      updated: data.updated || "Community report",
+      note: data.note || "",
+      checklist: data.checklist || [
+        "Avoid the reported area if it is unsafe",
+        "Share this with nearby residents if needed",
+        "Report to the local authorities if conditions worsen"
+      ]
+    };
+
+    markerFor(report, true).addTo(layerGroups.report);
+  });
+
+  updateLegendCounts();
 }
 
-function saveReport(report) {
-  const all = loadReports();
-  all.push(report);
-  localStorage.setItem("prahari_reports", JSON.stringify(all));
-}
-
-loadReports().forEach(r => markerFor(r, true).addTo(layerGroups.report));
+reportsCollection.onSnapshot((snapshot) => {
+  renderCommunityReports(snapshot);
+});

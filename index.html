@@ -22,12 +22,13 @@
       <div class="brand-title-wrap">
         <h1>AapdaSetu</h1>
       </div>
-      <p>Multi-hazard watch for India</p>
+      <p>India's disaster watch, powered by global hazard intelligence</p>
     </div>
     <span class="brand-mark"><i class="fa-solid fa-earth-americas"></i></span>
   </div>
 </header>
-<div class="status-pill" id="dataStatus"><span class="status-dot"></span>Showing sample data</div>
+<div class="status-pill" id="dataStatus"><span class="status-dot"></span><span class="status-copy">Showing demo data</span></div>
+<div class="source-alert" id="sourceErrorBanner" hidden></div>
 
 <main class="layout">
   <section class="map-panel">
@@ -87,15 +88,38 @@
     </div>
 
     <div class="floating-legend">
-      <h3>Legend</h3>
-      <div class="legend-item"><span class="legend-dot fire"></span> Fire</div>
-      <div class="legend-item"><span class="legend-dot flood"></span> Flood</div>
-      <div class="legend-item"><span class="legend-dot cyclone"></span> Cyclone</div>
-      <div class="legend-item"><span class="legend-dot landslide"></span> Landslide</div>
-      <div class="legend-item"><span class="legend-dot report"></span> Community</div>
+      <div class="legend-header">
+        <h3>Legend</h3>
+        <button id="dataSourceBtn" class="data-source-toggle" type="button" aria-label="View data sources">
+          <i class="fa-solid fa-circle-info"></i>
+        </button>
+      </div>
+      <div class="legend-item"><span class="legend-dot fire"></span> Fire <span class="legend-count" data-count-for="fire">(0)</span></div>
+      <div class="legend-item"><span class="legend-dot flood"></span> Flood <span class="legend-count" data-count-for="flood">(0)</span></div>
+      <div class="legend-item"><span class="legend-dot cyclone"></span> Cyclone <span class="legend-count" data-count-for="cyclone">(0)</span></div>
+      <div class="legend-item"><span class="legend-dot landslide"></span> Landslide <span class="legend-count" data-count-for="landslide">(0)</span></div>
+      <div class="legend-item"><span class="legend-dot report"></span> Community <span class="legend-count" data-count-for="report">(0)</span></div>
     </div>
   </section>
 </main>
+
+<!-- Data source info modal -->
+<div class="modal-backdrop" id="dataSourceModal" hidden>
+  <div class="modal data-source-modal">
+    <div class="modal-header compact">
+      <h2>Data sources</h2>
+      <button class="data-source-close" id="closeDataSourceModal" type="button" aria-label="Close data sources">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <ul class="data-source-list">
+      <li><strong>Fire:</strong> NASA FIRMS (live satellite data)</li>
+      <li><strong>Flood &amp; Cyclone:</strong> GDACS (Global Disaster Alert and Coordination System)</li>
+      <li><strong>Landslide:</strong> USGS Earthquake data (used as a landslide-risk indicator)</li>
+      <li><strong>Community reports:</strong> Firebase Firestore (live, user-submitted)</li>
+    </ul>
+  </div>
+</div>
 
 <!-- Simple report form, hidden until a map click happens in "report mode" -->
 <div class="modal-backdrop" id="modalBackdrop" hidden>
@@ -119,6 +143,20 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDw8fQ9V3ThGLIJUlGLsSUO5OuYzjsKdas",
+    authDomain: "aapdasetu-f9606.firebaseapp.com",
+    projectId: "aapdasetu-f9606",
+    storageBucket: "aapdasetu-f9606.firebasestorage.app",
+    messagingSenderId: "905675247808",
+    appId: "1:905675247808:web:3a3dcd7fcd52fab840dd25"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+</script>
 <script src="app.js"></script>
 </body>
 </html>

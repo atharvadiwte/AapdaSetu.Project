@@ -1,5 +1,5 @@
 {
-  "name": "prahari-backend",
+  "name": "AapdaSetu-backend",
   "version": "1.0.0",
   "description": "Small Express backend for the Prahari disaster tracker: shared community reports + a NASA FIRMS fire-data proxy.",
   "main": "server.js",
