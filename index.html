@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="style.css?v=3" />
+<link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
 
@@ -36,6 +36,17 @@
 
     <div class="sidebar-shell" id="sidebarShell">
       <div class="panel-stack" id="panelStack">
+        <section class="place-search" aria-label="Search for a place">
+          <form class="place-search-form" id="placeSearchForm">
+            <label class="visually-hidden" for="placeSearchInput">Search places</label>
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input id="placeSearchInput" type="search" placeholder="Search places..." autocomplete="off" required>
+            <button class="place-search-button" type="submit" aria-label="Search places">
+              <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+            </button>
+          </form>
+          <p class="place-search-status" id="placeSearchStatus" role="status" aria-live="polite" hidden></p>
+        </section>
         <div class="panel-group">
           <section class="panel panel-soft panel-collapsible">
             <div class="panel-header">

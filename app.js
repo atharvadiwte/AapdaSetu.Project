@@ -306,6 +306,69 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   noWrap: true
 }).addTo(map);
 
+const placeSearchForm = document.getElementById("placeSearchForm");
+const placeSearchInput = document.getElementById("placeSearchInput");
+const placeSearchButton = placeSearchForm.querySelector("button");
+const placeSearchStatus = document.getElementById("placeSearchStatus");
+let placeSearchMarker;
+
+placeSearchForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const query = placeSearchInput.value.trim();
+  if (!query) {
+    placeSearchInput.focus();
+    return;
+  }
+
+  placeSearchStatus.hidden = false;
+  placeSearchStatus.removeAttribute("aria-invalid");
+  placeSearchStatus.textContent = "Searching...";
+  placeSearchButton.disabled = true;
+
+  try {
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("limit", "1");
+    url.searchParams.set("q", query);
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Place search failed with status ${response.status}`);
+    }
+
+    const results = await response.json();
+    if (!Array.isArray(results) || results.length === 0) {
+      placeSearchStatus.textContent = "No places found. Try another search.";
+      placeSearchStatus.setAttribute("aria-invalid", "true");
+      return;
+    }
+
+    const place = results[0];
+    const lat = Number(place.lat);
+    const lng = Number(place.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      throw new Error("Place search returned invalid coordinates");
+    }
+
+    const location = [lat, lng];
+    const placeName = place.display_name || query;
+    map.flyTo(location, 12);
+    if (placeSearchMarker) map.removeLayer(placeSearchMarker);
+    placeSearchMarker = L.marker(location).addTo(map);
+    placeSearchMarker.bindPopup("").getPopup().setContent(
+      document.createTextNode(placeName)
+    );
+    placeSearchMarker.openPopup();
+    placeSearchStatus.textContent = `Found: ${placeName}`;
+  } catch (error) {
+    placeSearchStatus.textContent = "Place search is unavailable. Please try again.";
+    placeSearchStatus.setAttribute("aria-invalid", "true");
+    console.error("Place search failed:", error);
+  } finally {
+    placeSearchButton.disabled = false;
+  }
+});
+
 map.invalidateSize();
 setTimeout(() => map.invalidateSize(), 200);
 
